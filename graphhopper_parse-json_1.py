@@ -1,3 +1,9 @@
+# Team Name: Team P
+# Team Members:
+#   Paciencia, Linzel Marie
+#   Pillar, Gisele Joy
+#   Payo, Rigil Kent
+#   Plarisan, Hubert Harold
 import requests 
 import urllib.parse
 
