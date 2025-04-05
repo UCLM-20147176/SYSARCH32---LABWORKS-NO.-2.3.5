@@ -11,14 +11,14 @@ route_url = "https://graphhopper.com/api/1/route?"
 key = "d25591a8-cbbc-456d-8e3d-8a5f63420189"
 
 def geocoding(location, key):
-    while location == "":
+    while not location.strip():
         location = input("Enter the location again: ")
     geocode_url = "https://graphhopper.com/api/1/geocode?"
     url = geocode_url + urllib.parse.urlencode({"q": location, "limit": "1", "key": key})
 
     try:
         replydata = requests.get(url)
-        replydata.raise_for_status()  # Raise an exception for bad status codes
+        replydata.raise_for_status()
         json_data = replydata.json()
         json_status = replydata.status_code
 
@@ -27,31 +27,29 @@ def geocoding(location, key):
             lng = (json_data["hits"][0]["point"]["lng"])
             name = json_data["hits"][0]["name"]
             value = json_data["hits"][0]["osm_value"]
-            if "country" in json_data["hits"][0]:
-                country = json_data["hits"][0]["country"]
-            else:
-                country = ""
-            if "state" in json_data["hits"][0]:
-                state = json_data["hits"][0]["state"]
-            else:
-                state = ""
+            country = json_data["hits"][0].get("country", "")
+            state = json_data["hits"][0].get("state", "")
 
-            if len(state) != 0 and len(country) != 0:
+            if state and country:
                 new_loc = name + ", " + state + ", " + country
-            elif len(state) != 0:
+            elif country:
                 new_loc = name + ", " + country
             else:
                 new_loc = name
-            print("Geocoding API URL for " + new_loc + " (Location Type: " + value + ")\n" + url)
+            print(f"Geocoding API URL for {new_loc} (Location Type: {value})\n{url}")
         else:
             lat = "null"
             lng = "null"
             new_loc = location
             if json_status != 200:
-                print("Geocode API status: " + str(json_status) + "\nError message: " + json_data["message"])
+                print(f"Geocode API status: {json_status}\nError message: {json_data.get('message', 'No message provided')}")
         return json_status, lat, lng, new_loc
     except requests.exceptions.RequestException as e:
         print(f"Error during geocoding API request for '{location}': {e}")
+        return None, "null", "null", location
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"Error processing geocoding API response for '{location}': {e}")
+        print(f"Raw response: {replydata.text if 'replydata' in locals() else 'No response'}")
         return None, "null", "null", location
 
 while True:
@@ -61,56 +59,87 @@ while True:
     print("car, bike, foot")
     print("+++++++++++++++++++++++++++++++++++++++++++++")
     profile = ["car", "bike", "foot"]
-    vehicle = input("Enter a vehicle profile from the list above: ")
-    if vehicle == "quit" or vehicle == "q":
+    vehicle = input("Enter a vehicle profile from the list above: ").lower()
+    if vehicle in ["quit", "q"]:
         break
     elif vehicle in profile:
-        vehicle = vehicle
+        pass
     else:
         vehicle = "car"
         print("No valid vehicle profile was entered. Using the car profile.")
 
     loc1 = input("Starting Location: ")
-    if loc1 == "quit" or loc1 == "q":
+    if loc1.lower() in ["quit", "q"]:
         break
-    orig = geocoding(loc1, key)
-    if orig[0] is None:  # Check if geocoding failed
+    orig_status, orig_lat, orig_lng, orig_loc = geocoding(loc1, key)
+    if orig_status is None:
         continue
 
     loc2 = input("Destination: ")
-    if loc2 == "quit" or loc2 == "q":
+    if loc2.lower() in ["quit", "q"]:
         break
-    dest = geocoding(loc2, key)
-    if dest[0] is None:  # Check if geocoding failed
+    dest_status, dest_lat, dest_lng, dest_loc = geocoding(loc2, key)
+    if dest_status is None:
         continue
 
+    unit = input("Output distance in (miles/km): ").lower()
+    if unit not in ["miles", "km"]:
+        print("Invalid unit. Using kilometers (km).")
+        unit = "km"
+
     print("=================================================")
-    if orig[0] == 200 and dest[0] == 200:
-        op = "&point=" + str(orig[1]) + "%2C" + str(orig[2])
-        dp = "&point=" + str(dest[1]) + "%2C" + str(dest[2])
+    if orig_status == 200 and dest_status == 200 and orig_lat != "null" and orig_lng != "null" and dest_lat != "null" and dest_lng != "null":
+        op = f"&point={orig_lat}%2C{orig_lng}"
+        dp = f"&point={dest_lat}%2C{dest_lng}"
         paths_url = route_url + urllib.parse.urlencode({"key": key, "vehicle": vehicle}) + op + dp
-        paths_status = requests.get(paths_url).status_code
-        paths_data = requests.get(paths_url).json()
-        print("Routing API Status: " + str(paths_status) + "\nRouting API URL:\n" + paths_url)
-        print("=================================================")
-        print("Directions from " + orig[3] + " to " + dest[3] + " by " + vehicle)
-        print("=================================================")
-        if paths_status == 200:
-            miles = (paths_data["paths"][0]["distance"]) / 1000 / 1.61
-            km = (paths_data["paths"][0]["distance"]) / 1000
-            sec = int(paths_data["paths"][0]["time"] / 1000 % 60)
-            min = int(paths_data["paths"][0]["time"] / 1000 / 60 % 60)
-            hr = int(paths_data["paths"][0]["time"] / 1000 / 60 / 60)
-            print("Distance Traveled: {0:.1f} miles / {1:.1f} km".format(miles, km))
-            print("Trip Duration: {0:02d}:{1:02d}:{2:02d}".format(hr, min, sec))
+        try:
+            paths_response = requests.get(paths_url)
+            paths_response.raise_for_status()
+            paths_status = paths_response.status_code
+            paths_data = paths_response.json()
+            print(f"Routing API Status: {paths_status}\nRouting API URL:\n{paths_url}")
             print("=================================================")
-            for each in range(len(paths_data["paths"][0]["instructions"])):
-                path = paths_data["paths"][0]["instructions"][each]["text"]
-                distance = paths_data["paths"][0]["instructions"][each]["distance"]
-                print("{0} ( {1:.1f} km / {2:.1f} miles )".format(path, distance / 1000, distance / 1000 / 1.61))
-            print("=============================================")
-        else:
-            print("Error message: " + paths_data["message"])
+            print(f"Directions from {orig_loc} to {dest_loc} by {vehicle}")
+            print("=================================================")
+            if paths_status == 200 and "paths" in paths_data and len(paths_data["paths"]) > 0:
+                distance_meters = paths_data["paths"][0]["distance"]
+                time_ms = paths_data["paths"][0]["time"]
+                sec = int(time_ms / 1000 % 60)
+                minute = int(time_ms / 1000 / 60 % 60)
+                hour = int(time_ms / 1000 / 60 / 60)
+
+                if unit == "miles":
+                    distance = distance_meters / 1000 / 1.61
+                    unit_str = "miles"
+                else:
+                    distance = distance_meters / 1000
+                    unit_str = "km"
+
+                print(f"Distance Traveled: {distance:.1f} {unit_str}")
+                print(f"Trip Duration: {hour:02d}:{minute:02d}:{sec:02d}")
+                print("=================================================")
+                if "instructions" in paths_data["paths"][0]:
+                    for each in range(len(paths_data["paths"][0]["instructions"])):
+                        instruction = paths_data["paths"][0]["instructions"][each]
+                        path = instruction.get("text", "No instruction")
+                        instruction_distance_meters = instruction.get("distance", 0)
+                        if unit == "miles":
+                            instruction_distance = instruction_distance_meters / 1000 / 1.61
+                        else:
+                            instruction_distance = instruction_distance_meters / 1000
+                        print(f"{path} ( {instruction_distance:.1f} {unit_str} )")
+                    print("=============================================")
+                else:
+                    print("No detailed instructions found in the routing response.")
+            else:
+                print(f"Error in routing response: {paths_data.get('message', 'No message provided')}")
+                print("*************************************************")
+        except requests.exceptions.RequestException as e:
+            print(f"Error during routing API request: {e}")
+            print("*************************************************")
+        except (KeyError, IndexError, TypeError) as e:
+            print(f"Error processing routing API response: {e}")
+            print(f"Raw response: {paths_response.text if 'paths_response' in locals() else 'No response'}")
             print("*************************************************")
     else:
         print("Could not retrieve valid coordinates for both starting and destination locations.")
