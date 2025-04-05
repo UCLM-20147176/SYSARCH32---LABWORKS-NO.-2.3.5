@@ -4,7 +4,7 @@
 #   Pillar, Gisele Joy
 #   Payo, Rigil Kent
 #   Plarisan, Hubert Harold
-import requests 
+import requests
 import urllib.parse
 
 route_url = "https://graphhopper.com/api/1/route?"
@@ -16,39 +16,43 @@ def geocoding(location, key):
     geocode_url = "https://graphhopper.com/api/1/geocode?"
     url = geocode_url + urllib.parse.urlencode({"q": location, "limit": "1", "key": key})
 
-    replydata = requests.get(url)
-    json_data = replydata.json()
-    json_status = replydata.status_code
+    try:
+        replydata = requests.get(url)
+        replydata.raise_for_status()  # Raise an exception for bad status codes
+        json_data = replydata.json()
+        json_status = replydata.status_code
 
-    if json_status == 200 and len(json_data["hits"]) != 0:
-        json_data = requests.get(url).json()
-        lat = (json_data["hits"][0]["point"]["lat"])
-        lng = (json_data["hits"][0]["point"]["lng"])
-        name = json_data["hits"][0]["name"]
-        value = json_data["hits"][0]["osm_value"]
-        if "country" in json_data["hits"][0]:
-            country = json_data["hits"][0]["country"]
-        else:
-            country = ""
-        if "state" in json_data["hits"][0]:
-            state = json_data["hits"][0]["state"]
-        else:
-            state = ""
+        if json_status == 200 and len(json_data["hits"]) != 0:
+            lat = (json_data["hits"][0]["point"]["lat"])
+            lng = (json_data["hits"][0]["point"]["lng"])
+            name = json_data["hits"][0]["name"]
+            value = json_data["hits"][0]["osm_value"]
+            if "country" in json_data["hits"][0]:
+                country = json_data["hits"][0]["country"]
+            else:
+                country = ""
+            if "state" in json_data["hits"][0]:
+                state = json_data["hits"][0]["state"]
+            else:
+                state = ""
 
-        if len(state) != 0 and len(country) != 0:
-            new_loc = name + ", " + state + ", " + country
-        elif len(state) != 0:
-            new_loc = name + ", " + country
+            if len(state) != 0 and len(country) != 0:
+                new_loc = name + ", " + state + ", " + country
+            elif len(state) != 0:
+                new_loc = name + ", " + country
+            else:
+                new_loc = name
+            print("Geocoding API URL for " + new_loc + " (Location Type: " + value + ")\n" + url)
         else:
-            new_loc = name
-        print("Geocoding API URL for " + new_loc + " (Location Type: " + value + ")\n" + url)
-    else:
-        lat = "null"
-        lng = "null"
-        new_loc = location
-        if json_status != 200:
-            print("Geocode API status: " + str(json_status) + "\nError message: " + json_data["message"])
-    return json_status, lat, lng, new_loc
+            lat = "null"
+            lng = "null"
+            new_loc = location
+            if json_status != 200:
+                print("Geocode API status: " + str(json_status) + "\nError message: " + json_data["message"])
+        return json_status, lat, lng, new_loc
+    except requests.exceptions.RequestException as e:
+        print(f"Error during geocoding API request for '{location}': {e}")
+        return None, "null", "null", location
 
 while True:
     print("\n+++++++++++++++++++++++++++++++++++++++++++++")
@@ -70,11 +74,15 @@ while True:
     if loc1 == "quit" or loc1 == "q":
         break
     orig = geocoding(loc1, key)
+    if orig[0] is None:  # Check if geocoding failed
+        continue
 
     loc2 = input("Destination: ")
     if loc2 == "quit" or loc2 == "q":
         break
     dest = geocoding(loc2, key)
+    if dest[0] is None:  # Check if geocoding failed
+        continue
 
     print("=================================================")
     if orig[0] == 200 and dest[0] == 200:
@@ -104,3 +112,6 @@ while True:
         else:
             print("Error message: " + paths_data["message"])
             print("*************************************************")
+    else:
+        print("Could not retrieve valid coordinates for both starting and destination locations.")
+        print("*************************************************")
