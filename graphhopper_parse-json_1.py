@@ -131,6 +131,17 @@ while True:
                     print("=============================================")
                 else:
                     print("No detailed instructions found in the routing response.")
+
+                # --- Simple Map Integration ---#
+                map_zoom = 13  
+                map_width = 600
+                map_height = 400
+                map_url = f"https://www.openstreetmap.org/export/embed.html?bbox={min(float(orig_lng), float(dest_lng))},{min(float(orig_lat), float(dest_lat))},{max(float(orig_lng), float(dest_lng))},{max(float(orig_lat), float(dest_lat))}&layer=mapnik&marker={orig_lat},{orig_lng}&marker={dest_lat},{dest_lng}"
+                print("\n===================== MAP ======================")
+                print(f"Open this URL in your web browser to see a simple map:")
+                print(map_url)
+                print("=================================================")
+
             else:
                 print(f"Error in routing response: {paths_data.get('message', 'No message provided')}")
                 print("*************************************************")
