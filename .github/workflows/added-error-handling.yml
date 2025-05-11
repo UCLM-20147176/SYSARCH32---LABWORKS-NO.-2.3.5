@@ -1,4 +1,4 @@
-name: ✅ Test Error Handling Feature (CI Success Simulation)
+name: Test Error Handling Feature (CI Success Simulation)
 
 on:
   push:
