@@ -1,0 +1,32 @@
+name: Unit Choice Feature Check
+
+on:
+  push:
+    paths:
+      - '**/unit*.py'
+      - 'tests/test_units.py'
+  pull_request:
+    paths:
+      - '**/unit*.py'
+      - 'tests/graphhopper_parse-json_1.py'
+
+jobs:
+  test-unit-choice:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run unit choice tests
+        run: |
+          pytest tests/graphhopper_parse-json_1.py
